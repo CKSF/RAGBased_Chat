@@ -1,0 +1,14 @@
+flask
+flask-cors
+python-dotenv
+requests
+pydantic
+pypdf
+langchain
+langchain-community
+langchain-huggingface
+langchain-text-splitters
+chromadb
+volcengine
+openai
+sentence-transformers
