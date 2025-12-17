@@ -4,6 +4,8 @@
 # Project-specific
 chroma_db/
 doc_store/
+data/*
+!data/.gitkeep
 backend_errors.log
 
 # Python
