@@ -16,20 +16,22 @@ export interface LessonResponse {
   sources: string[];
 }
 
-const getAuthHeader = () => {
+const getAuthHeader = (): Record<string, string> => {
   if (typeof window !== "undefined") {
     return { "X-Access-Token": localStorage.getItem("app_password") || "" };
   }
   return {};
 };
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+
 export const api = {
   async sendMessage(message: string, history: ChatMessage[] = []) {
     // Convert history to format expected by backend if needed,
     // but for now backend accepts list of dicts which matches.
-    const res = await fetch("http://localhost:5001/api/chat/send", {
+    const res = await fetch(`${API_BASE}/api/chat/send`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...getAuthHeader() },
       body: JSON.stringify({ message, history }),
     });
     if (!res.ok) {
@@ -44,38 +46,16 @@ export const api = {
     return res.json() as Promise<ChatResponse>;
   },
 
-  async generateLessonPlan(topic: string, grade: string) {
-    const res = await fetch("http://localhost:5001/api/lesson/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ topic, grade }),
-    });
-    if (!res.ok) {
-      let errorText = await res.text().catch(() => "No error details");
-      try {
-        const json = JSON.parse(errorText);
-        if (json.error) errorText = json.error;
-      } catch {}
-      throw new Error(`API Error ${res.status}: ${errorText}`);
-    }
-    return res.json() as Promise<LessonResponse>;
-  },
-
   async streamMessage(
     message: string,
     history: ChatMessage[],
     onUpdate: (chunk: Partial<ChatMessage>) => void
   ) {
-    const response = await fetch(
-      `${
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api"
-      }/chat/send`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, history }),
-      }
-    );
+    const response = await fetch(`${API_BASE}/api/chat/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getAuthHeader() },
+      body: JSON.stringify({ message, history }),
+    });
 
     if (!response.body) throw new Error("No response body");
 
@@ -122,16 +102,11 @@ export const api = {
     grade: string,
     onUpdate: (chunk: Partial<ChatMessage>) => void
   ) {
-    const response = await fetch(
-      `${
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api"
-      }/lesson/generate`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, grade }),
-      }
-    );
+    const response = await fetch(`${API_BASE}/lesson/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getAuthHeader() },
+      body: JSON.stringify({ topic, grade }),
+    });
 
     if (!response.body) throw new Error("No response body");
 
