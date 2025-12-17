@@ -17,9 +17,18 @@ def send_message():
     history = data.get('history', [])
     
     try:
-        # 1. RAG
-        print(f"DEBUG: Entering RAG query for '{user_message}'", flush=True)
-        documents = rag_service.query(user_message, k=3)
+        # 1. Sliding Window: Truncate history to last 5 turns (10 messages)
+        MAX_HISTORY_TURNS = 5
+        if len(history) > MAX_HISTORY_TURNS * 2:
+            history = history[-(MAX_HISTORY_TURNS * 2):]
+            print(f"📝 Truncated history to last {MAX_HISTORY_TURNS} turns")
+        
+        # 2. Context-Aware Query Rewriting
+        rewritten_query = llm_service.rewrite_query(user_message, history)
+        
+        # 3. RAG Retrieval (use rewritten query)
+        print(f"🔍 RAG query: '{rewritten_query}'", flush=True)
+        documents = rag_service.query(rewritten_query, k=3)
         print(f"DEBUG: RAG query complete. Found {len(documents)} docs", flush=True)
 
         context_text = ""

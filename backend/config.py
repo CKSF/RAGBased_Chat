@@ -10,6 +10,9 @@ class Config:
     VOLC_API_KEY = os.getenv('VOLC_API_KEY')
     VOLC_BASE_URL = os.getenv('VOLC_BASE_URL', 'https://ark.cn-beijing.volces.com/api/v3')
     VOLC_MODEL = os.getenv('VOLC_MODEL', 'deepseek-r1-250528')
+    
+    # Lightweight model for fast tasks (query rewriting)
+    VOLC_LITE_MODEL = os.getenv('VOLC_LITE_MODEL', 'doubao-lite-4k')
 
     @classmethod
     def validate(cls):
