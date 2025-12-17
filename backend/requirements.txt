@@ -12,3 +12,4 @@ chromadb
 volcengine
 openai
 sentence-transformers
+langchain-chroma

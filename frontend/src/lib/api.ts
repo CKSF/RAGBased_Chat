@@ -23,7 +23,8 @@ const getAuthHeader = (): Record<string, string> => {
   return {};
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+const isProd = process.env.NODE_ENV === "production";
+const API_BASE = isProd ? "" : "http://localhost:5001";
 
 export const api = {
   async sendMessage(message: string, history: ChatMessage[] = []) {

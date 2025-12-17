@@ -1,4 +1,3 @@
-# Stage 1: Build
 FROM node:20-alpine AS builder
 WORKDIR /app
 
@@ -12,9 +11,8 @@ COPY frontend/ .
 ENV NEXT_PUBLIC_API_URL=""
 RUN npm run build
 
-# Stage 2: Serve
 FROM nginx:alpine
-# 🇨🇳 CHINA FIX: Use Aliyun Alpine Mirror (Optional, but good practice)
+# 🇨🇳 CHINA FIX: Alpine Mirror
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 
 COPY --from=builder /app/out /usr/share/nginx/html
