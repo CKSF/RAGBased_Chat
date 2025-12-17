@@ -16,6 +16,13 @@ export interface LessonResponse {
   sources: string[];
 }
 
+const getAuthHeader = () => {
+  if (typeof window !== "undefined") {
+    return { "X-Access-Token": localStorage.getItem("app_password") || "" };
+  }
+  return {};
+};
+
 export const api = {
   async sendMessage(message: string, history: ChatMessage[] = []) {
     // Convert history to format expected by backend if needed,
