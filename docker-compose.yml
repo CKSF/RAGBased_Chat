@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: sizheng_backend
+    ports:
+      - "5001:5001"
+    # Docker automatically reads .env at root
+    env_file:
+      - .env
+    environment:
+      - HF_ENDPOINT=https://hf-mirror.com
+      - BACKEND_PORT=5001
+    volumes:
+      # Persist your database
+      - ./chroma_db:/app/chroma_db
+      # Optional: Persist data folder if needed
+      - ./data:/app/data
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: sizheng_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
