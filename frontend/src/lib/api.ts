@@ -103,7 +103,7 @@ export const api = {
     grade: string,
     onUpdate: (chunk: Partial<ChatMessage>) => void
   ) {
-    const response = await fetch(`${API_BASE}/lesson/generate`, {
+    const response = await fetch(`${API_BASE}/api/lesson/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeader() },
       body: JSON.stringify({ topic, grade }),
