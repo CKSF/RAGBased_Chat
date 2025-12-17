@@ -70,7 +70,7 @@ python build_db.py
 ```
 浏览器 (localhost:3000)
     ↓ (直接 HTTP 请求，启用 CORS)
-Waitress Server (localhost:5000)
+Waitress Server (localhost:5001)
     ↓
 Flask Application
     ├─ /api/chat/send → RAGService → LLMService
@@ -113,7 +113,7 @@ SiZhengChatbox/
 - **生产级稳定性**：替代 Flask 自带的开发服务器，解决 Windows 下多线程/SQLite 冲突导致的连接不稳定问题。
 
 ### 直接后端连接
-- **跨域请求 (CORS)**：前端直接访问 `http://localhost:5000`，绕过 Next.js 代理层，避免 Turbopack rewrites 的兼容性问题。
+- **跨域请求 (CORS)**：前端直接访问 `http://localhost:5001`，绕过 Next.js 代理层，避免 Turbopack rewrites 的兼容性问题。
 
 ## �️ 开发说明
 

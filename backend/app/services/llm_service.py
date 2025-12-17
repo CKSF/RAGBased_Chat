@@ -1,6 +1,6 @@
 from openai import OpenAI
 from backend.config import Config
-from typing import List, Optional
+from typing import List, Optional, Generator
 
 class LLMService:
     def __init__(self):
@@ -11,6 +11,35 @@ class LLMService:
         )
         self.model = Config.VOLC_MODEL
         self.lite_model = Config.VOLC_LITE_MODEL  # Fast model for simple tasks
+        
+    def stream_response(self, user_prompt: str, system_prompt: str = None, history: List[dict] = None) -> Generator[str, None, None]:
+        """
+        Stream response token by token.
+        """
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        if history:
+            # Sanitize history: Volcengine strict mode only allows 'role' and 'content'
+            clean_history = [{"role": m["role"], "content": m["content"]} for m in history if m["role"] in ["user", "assistant"]]
+            messages.extend(clean_history)
+            
+        messages.append({"role": "user", "content": user_prompt})
+        
+        try:
+            stream = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                stream=True,
+                temperature=0.7 
+            )
+            
+            for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+                    
+        except Exception as e:
+            yield f"[LLM ERROR: {str(e)}]"
 
     def get_response(self, user_prompt: str, system_prompt: str = None, history: List[dict] = None) -> str:
         """

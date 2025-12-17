@@ -1,74 +1,71 @@
-from flask import Blueprint, request, jsonify
+import json
+import traceback
+from flask import Blueprint, request, jsonify, stream_with_context, Response
 from backend.app.services import rag_service, llm_service
 
 chat_bp = Blueprint('chat', __name__)
 
+def format_sse(event_type: str, data: dict):
+    """Helper to format Server-Sent Events (SSE)."""
+    return f"data: {json.dumps({'type': event_type, 'data': data}, ensure_ascii=False)}\n\n"
+
 @chat_bp.route('/send', methods=['POST'])
 def send_message():
-    """
-    Handle chat messages.
-    Payload: { "message": "什么是思政课?", "history": [...] }
-    """
-    data = request.json
-    if not data or 'message' not in data:
-        return jsonify({"error": "Message is required"}), 400
-        
-    user_message = data['message']
-    history = data.get('history', [])
-    
-    try:
-        # 1. Sliding Window: Truncate history to last 5 turns (10 messages)
-        MAX_HISTORY_TURNS = 5
-        if len(history) > MAX_HISTORY_TURNS * 2:
-            history = history[-(MAX_HISTORY_TURNS * 2):]
-            print(f"📝 Truncated history to last {MAX_HISTORY_TURNS} turns")
-        
-        # 2. Context-Aware Query Rewriting
-        rewritten_query = llm_service.rewrite_query(user_message, history)
-        
-        # 3. RAG Retrieval (use rewritten query)
-        print(f"🔍 RAG query: '{rewritten_query}'", flush=True)
-        documents = rag_service.query(rewritten_query, k=3)
-        print(f"DEBUG: RAG query complete. Found {len(documents)} docs", flush=True)
+    # 1. Parse Request
+    req_data = request.json
+    user_message = req_data.get('message', '')
+    history = req_data.get('history', [])
 
-        context_text = ""
-        sources = []
-        for doc in documents:
-            source_name = doc.metadata.get('source', 'Unknown')
-            if source_name not in sources:
-                sources.append(source_name)
-            context_text += f"\n---\n[Source: {source_name}]\n{doc.page_content}\n"
-
-        # 2. Prompt
-        system_prompt = (
-            "你是一个专业的思政课助教大模型。请根据提供的背景资料（Context）回答用户的问题。\n"
-            "如果资料中没有答案，请诚实说明，并尝试用你的通用知识补充，但要明确区分。\n"
-            "回答风格：严谨、准确、积极正向。\n\n"
-            f"### 背景资料 (Context):\n{context_text}"
-        )
-        
-        # 3. LLM
-        print(f"DEBUG: Preparing to call LLM...", flush=True)
-        response_text = llm_service.get_response(
-            user_message, 
-            system_prompt=system_prompt,
-            history=history
-        )
-        print(f"DEBUG: LLM returned response length: {len(response_text)}", flush=True)
-        
-        return jsonify({
-            "reply": response_text,
-            "sources": sources,
-            "context_used": context_text[:200] + "..." 
-        })
-
-    except Exception as e:
-        import traceback
-        error_trace = traceback.format_exc()
-        
-        # Log to file
-        with open("backend_errors.log", "a", encoding="utf-8") as f:
-            f.write(f"\n[{request.remote_addr}] Chat Error:\n{error_trace}\n{'='*50}\n")
+    def generate():
+        try:
+            # --- STEP 1: QUERY REWRITING ---
+            yield format_sse('thought', "🤔 正在理解您的问题上下文...")
+            rewritten_query = llm_service.rewrite_query(user_message, history)
             
-        print(f"❌ Chat Error:\n{error_trace}", flush=True)
-        return jsonify({"error": f"{str(e)}\n\nTraceback:\n{error_trace}"}), 500
+            if rewritten_query != user_message:
+                yield format_sse('thought', f"🔄 优化查询为: “{rewritten_query}”")
+
+            # --- STEP 2: RAG RETRIEVAL ---
+            yield format_sse('thought', "📚 正在检索思政知识库...")
+            
+            # Perform Query
+            documents = rag_service.query(rewritten_query, k=3)
+            
+            # --- STEP 3: INTERMEDIATE DATA (THE COLLAPSIBLE INFO) ---
+            doc_count = len(documents)
+            if doc_count == 0:
+                yield format_sse('thought', "⚠️ 未找到相关资料，将基于通用知识回答。")
+                context_text = ""
+                sources = []
+            else:
+                sources = list(set([doc.metadata.get('source', 'Unknown') for doc in documents]))
+                yield format_sse('thought', f"✅ 检索完成：找到 {doc_count} 份相关文档。")
+                yield format_sse('thought', f"📄 参考来源: {', '.join(sources)}")
+                
+                context_text = ""
+                for doc in documents:
+                    context_text += f"\n---\n[Source: {doc.metadata.get('source')}]\n{doc.page_content}\n"
+
+            # --- STEP 4: LLM GENERATION ---
+            yield format_sse('thought', "🧠 正在整理答案...")
+            
+            system_prompt = (
+                "你是一个专业的思政课助教大模型。请根据提供的背景资料（Context）回答用户的问题。\n"
+                "如果资料中没有答案，请诚实说明，并尝试用你的通用知识补充，但要明确区分。\n"
+                "回答风格：严谨、准确、积极正向。\n\n"
+                f"### 背景资料 (Context):\n{context_text}"
+            )
+
+            # Stream the actual text token-by-token
+            for token in llm_service.stream_response(user_message, system_prompt, history):
+                yield format_sse('token', token)
+            
+            # --- STEP 5: FINISH ---
+            # Send the sources one last time so the UI can lock them in
+            yield format_sse('done', {"sources": sources})
+
+        except Exception as e:
+            traceback.print_exc()
+            yield format_sse('error', str(e))
+
+    return Response(stream_with_context(generate()), mimetype='text/event-stream')

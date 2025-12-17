@@ -8,10 +8,14 @@ import os
 import requests
 import time
 from typing import List, Dict
+from dotenv import load_dotenv
+
+load_dotenv()
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-API_URL = "http://localhost:5000/api/chat/send"
+BACKEND_API = load_dotenv("BACKEND_API")
+API_URL = f"http://localhost:{BACKEND_API}/api/chat/send"
 
 class TestCase:
     def __init__(self, name: str, description: str):
@@ -181,7 +185,7 @@ def test_6_long_history():
     
     # 先请求生成教案（会有很长的回复）
     lesson_response = requests.post(
-        "http://localhost:5000/api/lesson/generate",
+        "http://localhost:5001/api/lesson/generate",
         json={"topic": "高质量发展", "grade": "大学"},
         timeout=None  # 无超时限制
     )
@@ -252,7 +256,7 @@ if __name__ == "__main__":
     
     # Check if server is running
     try:
-        health = requests.get("http://localhost:5000/health", timeout=2)
+        health = requests.get("http://localhost:5001/health", timeout=2)
         print(f"✅ 服务器状态: {health.json()}")
     except:
         print("❌ 后端服务未运行，请先启动 run.py")
