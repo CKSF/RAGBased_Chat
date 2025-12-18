@@ -16,29 +16,33 @@ export interface LessonResponse {
   sources: string[];
 }
 
-const getAuthHeader = () => {
+// ✅ Fix: Return explicit Record type
+const getAuthHeader = (): Record<string, string> => {
   if (typeof window !== "undefined") {
-    return { "X-Access-Token": localStorage.getItem("app_password") || "" };
+    const pwd = localStorage.getItem("app_password");
+    if (pwd) {
+      return { "X-Access-Token": pwd };
+    }
   }
   return {};
 };
 
 export const api = {
   async sendMessage(message: string, history: ChatMessage[] = []) {
-    // Convert history to format expected by backend if needed,
-    // but for now backend accepts list of dicts which matches.
     const res = await fetch("http://localhost:5001/api/chat/send", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeader()
+      },
       body: JSON.stringify({ message, history }),
     });
     if (!res.ok) {
       let errorText = await res.text().catch(() => "No error details");
       try {
-        // Try to parse JSON if possible to look for "error" field
         const json = JSON.parse(errorText);
         if (json.error) errorText = json.error;
-      } catch {}
+      } catch { }
       throw new Error(`API Error ${res.status}: ${errorText}`);
     }
     return res.json() as Promise<ChatResponse>;
@@ -47,7 +51,10 @@ export const api = {
   async generateLessonPlan(topic: string, grade: string) {
     const res = await fetch("http://localhost:5001/api/lesson/generate", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeader()
+      },
       body: JSON.stringify({ topic, grade }),
     });
     if (!res.ok) {
@@ -55,85 +62,38 @@ export const api = {
       try {
         const json = JSON.parse(errorText);
         if (json.error) errorText = json.error;
-      } catch {}
+      } catch { }
       throw new Error(`API Error ${res.status}: ${errorText}`);
     }
     return res.json() as Promise<LessonResponse>;
   },
 
+  // ✅ Streaming Chat
   async streamMessage(
     message: string,
     history: ChatMessage[],
     onUpdate: (chunk: Partial<ChatMessage>) => void
   ) {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...getAuthHeader()
+    };
+
     const response = await fetch(
-      `${
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api"
+      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api"
       }/chat/send`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers, // ✅ Pass as strictly typed object
         body: JSON.stringify({ message, history }),
       }
     );
 
     if (!response.body) throw new Error("No response body");
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n\n");
-      buffer = lines.pop() || ""; // Keep incomplete chunk in buffer
-
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          const jsonStr = line.slice(6);
-          try {
-            const event = JSON.parse(jsonStr);
-
-            if (event.type === "thought") {
-              // Update UI with new thought step
-              onUpdate({ thoughts: [event.data] });
-            } else if (event.type === "token") {
-              // Append token to content
-              onUpdate({ content: event.data });
-            } else if (event.type === "done") {
-              // Finalize sources
-              onUpdate({ sources: event.data.sources });
-            } else if (event.type === "error") {
-              throw new Error(event.data);
-            }
-          } catch (e) {
-            console.error("Error parsing SSE:", e);
-          }
-        }
-      }
+    if (!response.ok) {
+      if (response.status === 401) throw new Error("Unauthorized");
+      throw new Error("Network response was not ok");
     }
-  },
-
-  async streamLessonPlan(
-    topic: string,
-    grade: string,
-    onUpdate: (chunk: Partial<ChatMessage>) => void
-  ) {
-    const response = await fetch(
-      `${
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api"
-      }/lesson/generate`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, grade }),
-      }
-    );
-
-    if (!response.body) throw new Error("No response body");
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -154,9 +114,71 @@ export const api = {
             const event = JSON.parse(jsonStr);
 
             if (event.type === "thought") {
-              onUpdate({ thoughts: [event.data] }); // Append thought
+              onUpdate({ thoughts: [event.data] });
             } else if (event.type === "token") {
-              onUpdate({ content: event.data }); // Append token
+              onUpdate({ content: event.data });
+            } else if (event.type === "done") {
+              onUpdate({ sources: event.data.sources });
+            } else if (event.type === "error") {
+              throw new Error(event.data);
+            }
+          } catch (e) {
+            console.error("Error parsing SSE:", e);
+          }
+        }
+      }
+    }
+  },
+
+  // ✅ Streaming Lesson Plan
+  async streamLessonPlan(
+    topic: string,
+    grade: string,
+    onUpdate: (chunk: Partial<ChatMessage>) => void
+  ) {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...getAuthHeader()
+    };
+
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api"
+      }/lesson/generate`,
+      {
+        method: "POST",
+        headers, // ✅ Pass as strictly typed object
+        body: JSON.stringify({ topic, grade }),
+      }
+    );
+
+    if (!response.body) throw new Error("No response body");
+    if (!response.ok) {
+      if (response.status === 401) throw new Error("Unauthorized");
+      throw new Error("Network response was not ok");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          const jsonStr = line.slice(6);
+          try {
+            const event = JSON.parse(jsonStr);
+
+            if (event.type === "thought") {
+              onUpdate({ thoughts: [event.data] });
+            } else if (event.type === "token") {
+              onUpdate({ content: event.data });
             } else if (event.type === "done") {
               onUpdate({ sources: event.data.sources });
             } else if (event.type === "error") {

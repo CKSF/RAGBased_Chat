@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 import { clsx } from "clsx";
 import {
   Bot,
@@ -8,7 +10,7 @@ import {
   ChevronRight,
   BrainCircuit,
 } from "lucide-react";
-import { ChatMessage } from "@/lib/api"; // Import your type
+import { ChatMessage } from "@/lib/api";
 
 export function MessageBubble({
   role,
@@ -17,7 +19,7 @@ export function MessageBubble({
   thoughts,
 }: ChatMessage) {
   const isUser = role === "user";
-  const [isThinkingOpen, setIsThinkingOpen] = useState(true); // Default open or closed
+  const [isThinkingOpen, setIsThinkingOpen] = useState(true);
 
   return (
     <div
@@ -71,8 +73,14 @@ export function MessageBubble({
         )}
 
         {/* Main Content */}
-        <div className="prose break-words dark:prose-invert prose-p:leading-relaxed prose-pre:p-0 text-sm md:text-base">
-          <ReactMarkdown>{content}</ReactMarkdown>
+        <div className="prose break-words dark:prose-invert prose-p:leading-relaxed prose-pre:p-0 text-sm md:text-base max-w-none">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeRaw]}
+          >
+            {content}
+          </ReactMarkdown>
+
           {/* Blinking cursor effect while generating */}
           {role === "assistant" && !content && (
             <span className="inline-block w-2 h-4 bg-zinc-400 animate-pulse align-middle ml-1" />
