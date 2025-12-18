@@ -6,7 +6,7 @@ import importlib.util
 
 def build_knowledge_base():
     print("\n" + "="*50)
-    print("🚀 STARTING DATABASE BUILD (Ghost-Free Mode)")
+    print("🚀 STARTING DATABASE BUILD (Progress Bar Mode)")
     print("="*50)
 
     # 1. CLEANUP
@@ -22,7 +22,7 @@ def build_knowledge_base():
         shutil.rmtree("doc_store", ignore_errors=True)
         print("   -> Removed doc_store")
 
-    # 2. INIT (The "Sniper" Import)
+    # 2. INIT
     print("\n🚀 [Step 2] Initializing RAG Service...")
     try:
         # Load PDFService manually
@@ -31,13 +31,12 @@ def build_knowledge_base():
         pdf_spec.loader.exec_module(pdf_module)
         PDFService = pdf_module.PDFService
 
-        # Load RAGService manually (Bypassing package __init__!)
+        # Load RAGService manually
         rag_spec = importlib.util.spec_from_file_location("rag_service", "backend/app/services/rag_service.py")
         rag_module = importlib.util.module_from_spec(rag_spec)
         rag_spec.loader.exec_module(rag_module)
         RAGService = rag_module.RAGService
         
-        # Now instantiate
         rag = RAGService(persist_directory="chroma_db", parent_store_directory="doc_store")
         
     except Exception as e:
@@ -64,20 +63,38 @@ def build_knowledge_base():
         
         try:
             print("   [1/3] Extracting text...", end=" ", flush=True)
-            start_time = time.time()
             text = PDFService.extract_text(absolute_path)
-            duration = time.time() - start_time
-            print(f"Done ({duration:.2f}s)")
+            print("Done.")
 
             if not text:
                 print("   ⚠️ [WARN] Extracted text is empty. Skipping.")
                 continue
             
-            print(f"   [2/3] Got {len(text)} characters.")
-            print("   [3/3] Sending to ChromaDB...", end=" ", flush=True)
+            total_chars = len(text)
+            print(f"   [2/3] Total Length: {total_chars} characters.")
             
-            rag.add_documents(text, metadata={"source": filename})
-            print("Done.")
+            # --- THE NEW BATCHING LOGIC ---
+            print(f"   [3/3] Sending to ChromaDB in batches (to prevent freeze)...")
+            
+            # We split text into chunks of ~1000 chars to show progress
+            # RAGService usually handles splitting, but this feed-in loop 
+            # ensures we see progress and don't kill the CPU.
+            batch_size = 1000 
+            chunks = [text[i:i+batch_size] for i in range(0, len(text), batch_size)]
+            total_batches = len(chunks)
+
+            for b_idx, chunk in enumerate(chunks):
+                # Print progress bar
+                percent = ((b_idx + 1) / total_batches) * 100
+                print(f"\r        Batch {b_idx+1}/{total_batches} [{percent:.1f}%] ...", end="", flush=True)
+                
+                # Send this small piece
+                rag.add_documents(chunk, metadata={"source": filename})
+                
+                # Tiny sleep to let your CPU breathe (Prevents SSH freeze)
+                time.sleep(0.05) 
+
+            print("\n        ✅ File Completed.")
             success_count += 1
             
         except Exception as e:

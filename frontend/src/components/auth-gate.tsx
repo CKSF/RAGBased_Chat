@@ -12,18 +12,16 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   // Helper to verify password with Backend
   const verifyPassword = async (pwd: string) => {
     try {
-      const res = await fetch(
-        `${
-          process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001"
-        }/api/verify`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Access-Token": pwd,
-          },
-        }
-      );
+      const isProd = process.env.NODE_ENV === "production";
+      const apiBase = isProd ? "" : "http://localhost:5001";
+
+      const res = await fetch(`${apiBase}/api/verify`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Access-Token": pwd,
+        },
+      });
       return res.ok; // Returns true if 200 OK, false if 401 Unauthorized
     } catch (e) {
       console.error("Verification failed:", e);

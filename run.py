@@ -9,6 +9,6 @@ load_dotenv()
 app = create_app()
 
 if __name__ == '__main__':
-    port = os.getenv("BACKEND_API")
-    print(f"🚀 Starting Waitress Server on http://0.0.0.0:5001")
-    serve(app, host='0.0.0.0', port=5001, threads=6)
+    port = int(os.environ.get("BACKEND_API", 5001))
+    print(f"🚀 Starting Waitress Server on http://0.0.0.0:{port}", flush=True)
+    serve(app, host='0.0.0.0', port=port, threads=6)

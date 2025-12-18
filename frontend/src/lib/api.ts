@@ -27,9 +27,14 @@ const getAuthHeader = (): Record<string, string> => {
   return {};
 };
 
+// Deployment branch logic for API_BASE
+const isProd = process.env.NODE_ENV === "production";
+const API_BASE = isProd ? "" : "http://localhost:5001";
+
 export const api = {
   async sendMessage(message: string, history: ChatMessage[] = []) {
-    const res = await fetch("http://localhost:5001/api/chat/send", {
+    // Deployment branch uses API_BASE
+    const res = await fetch(`${API_BASE}/api/chat/send`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -49,7 +54,7 @@ export const api = {
   },
 
   async generateLessonPlan(topic: string, grade: string) {
-    const res = await fetch("http://localhost:5001/api/lesson/generate", {
+    const res = await fetch(`${API_BASE}/api/lesson/generate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -74,20 +79,17 @@ export const api = {
     history: ChatMessage[],
     onUpdate: (chunk: Partial<ChatMessage>) => void
   ) {
+    // Keep strict typing from HEAD
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       ...getAuthHeader()
     };
 
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api"
-      }/chat/send`,
-      {
-        method: "POST",
-        headers, // ✅ Pass as strictly typed object
-        body: JSON.stringify({ message, history }),
-      }
-    );
+    const response = await fetch(`${API_BASE}/api/chat/send`, {
+      method: "POST",
+      headers, // ✅ Pass as strictly typed object
+      body: JSON.stringify({ message, history }),
+    });
 
     if (!response.body) throw new Error("No response body");
     if (!response.ok) {
@@ -136,20 +138,17 @@ export const api = {
     grade: string,
     onUpdate: (chunk: Partial<ChatMessage>) => void
   ) {
+    // Keep strict typing from HEAD
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       ...getAuthHeader()
     };
 
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api"
-      }/lesson/generate`,
-      {
-        method: "POST",
-        headers, // ✅ Pass as strictly typed object
-        body: JSON.stringify({ topic, grade }),
-      }
-    );
+    const response = await fetch(`${API_BASE}/api/lesson/generate`, {
+      method: "POST",
+      headers, // ✅ Pass as strictly typed object
+      body: JSON.stringify({ topic, grade }),
+    });
 
     if (!response.body) throw new Error("No response body");
     if (!response.ok) {
