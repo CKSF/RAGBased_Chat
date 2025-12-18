@@ -6,7 +6,7 @@
 
 ### 前置要求
 - Python 3.12+
-- Node.js 16+
+- Node.js 20+
 - `.env` 文件配置（包含 Volcengine API Key）
 
 ### 1. 启动后端 (Waitress Server)
@@ -18,7 +18,7 @@
 # 2. 运行后端服务（使用 Waitress 生产级服务器）
 python run.py
 ```
-后端服务将在 `http://localhost:5000` 启动。
+后端服务将在 `http://localhost:5001` 启动。
 
 ### 2. 启动前端 (Next.js)
 
@@ -161,9 +161,38 @@ VOLC_MODEL=ep-xxxxx-deepseek-r1
 
 # 轻量级模型配置 (用于查询改写)
 VOLC_LITE_MODEL=ep-xxxxx-doubao-lite-4k
+
+# Auth-Gate 访问请求
+ACCESS_PASSWORD=请联系负责人
 ```
+
+### 部署与运维
+项目已完成容器化，在阿里云ECS实例部署。具体请联系负责人: shiyuxuanrolf@gmail.com
+
+#### 上传新文档
+1. 使用scp将文档存入服务器的 data/ 目录。目标位置为公网IP。
+2. 重建索引：运行以下命令调用容器内的环境进行构建（支持进度条显示）：<br/>
+  ```sudo docker compose run --rm -v "$(pwd)/build_db.py:/app/build_db.py" backend python build_db.py```
+5. 加载生效：重启后端服务以加载新数据库：<br/>
+  ```sudo docker compose restart backend```
+
+### Docker Compose相关
+1. 首次启动 / 全量重启，构建镜像并后台启动所有服务：<br/>
+```sudo docker compose up -d --build```
+
+2. 查看状态与日志
+- 检查容器运行状态：```sudo docker compose ps```
+- 查看后端日志（排查报错/查看 RAG 检索过程）：```sudo docker compose logs -f --tail=100 backend```
+
+3. 单独更新服务
+- 更新前端（修改了页面 UI 或 API 地址）：```sudo docker compose up -d --build frontend```
+- 更新后端（修改了 Python 代码或路由）：```sudo docker compose restart backend```
+
+4. 停止服务: ```sudo docker compose down```
+
 
 ## 📝 更新日志
 
 - **2025-12-16**: 实现上下文感知检索（智能改写 + 滑动窗口），添加边缘情况测试套件，文档全面更新。
 - **2025-12-16**: 完成前后端联调，切换至 Waitress 服务器，实现稳定的统一对话界面。
+- **2025-12-17**: 优化向量库构建流程，前端已知Bug修复，完成流式（Stream）输出，完成部署。
