@@ -29,7 +29,7 @@ def generate_lesson_plan():
             yield format_sse('thought', f"📚 正在检索相关思政课标与素材: '{query}'...")
             
             # Retrieve 5 docs (Standard search)
-            documents = rag_service.query(query, k=5)
+            documents = rag_service.query(query, k=8)
             
             if not documents:
                 yield format_sse('thought', "⚠️ 未找到特定素材，将基于通用教学理论设计。")

@@ -30,6 +30,12 @@ def build_knowledge_base():
         pdf_module = importlib.util.module_from_spec(pdf_spec)
         pdf_spec.loader.exec_module(pdf_module)
         PDFService = pdf_module.PDFService
+        
+        # Load DocxService
+        docx_spec = importlib.util.spec_from_file_location("docx_service", "backend/app/services/docx_service.py")
+        docx_module = importlib.util.module_from_spec(docx_spec)
+        docx_spec.loader.exec_module(docx_module)
+        DocxService = docx_module.DocxService
 
         # Load RAGService manually
         rag_spec = importlib.util.spec_from_file_location("rag_service", "backend/app/services/rag_service.py")
@@ -51,7 +57,7 @@ def build_knowledge_base():
         print(f"❌ Error: Data directory '{data_dir}' not found.")
         return
 
-    files = [f for f in os.listdir(data_dir) if f.lower().endswith(".pdf")]
+    files = [f for f in os.listdir(data_dir) if f.lower().endswith((".pdf", ".docx"))]
     print(f"\n📂 [Step 3] Scanning '{data_dir}': Found {len(files)} PDFs.")
     
     success_count = 0
@@ -63,7 +69,10 @@ def build_knowledge_base():
         
         try:
             print("   [1/3] Extracting text...", end=" ", flush=True)
-            text = PDFService.extract_text(absolute_path)
+            if filename.lower().endswith(".pdf"):
+                text = PDFService.extract_text(absolute_path)
+            elif filename.lower().endswith(".docx"):
+                text = DocxService.extract_text(absolute_path)
             print("Done.")
 
             if not text:
