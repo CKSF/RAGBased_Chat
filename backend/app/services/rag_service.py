@@ -128,7 +128,12 @@ class RAGService:
         child_docs = []
         for i, (doc, score) in enumerate(results_with_scores):
             # Lower score is usually better in Chroma (Distance)
-            print(f"     [{i}] Score: {score:.4f} | ID: {doc.metadata.get('parent_id')} | Content: {doc.page_content[:20]}...")
+            source_name = doc.metadata.get('source', 'Unknown')
+            parent_id = doc.metadata.get('parent_id', 'None')
+            
+            print(f"     [{i}] Score: {score:.4f} | Source: {source_name}")
+            print(f"         ID: {parent_id} | Content: {doc.page_content[:30]}...")
+            
             child_docs.append(doc)
             
         # 2. Get Parent IDs
