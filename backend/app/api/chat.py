@@ -29,7 +29,7 @@ def send_message():
             yield format_sse('thought', "📚 正在检索思政知识库...")
             
             # Perform Query
-            documents = rag_service.query(rewritten_query, k=3)
+            documents = rag_service.query(rewritten_query, k=8)
             
             # --- STEP 3: INTERMEDIATE DATA (THE COLLAPSIBLE INFO) ---
             doc_count = len(documents)

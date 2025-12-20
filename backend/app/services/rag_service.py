@@ -3,7 +3,7 @@ import uuid
 import json
 from typing import List, Optional
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.retrievers import BM25Retriever
@@ -53,6 +53,7 @@ class EnsembleRetriever:
         
         # Return only the Document objects
         return [item["doc"] for item in fused_docs]
+
 
 class SimpleFileStore:
     """A simple persistent key-value store for parent documents."""
@@ -230,7 +231,6 @@ class RAGService:
         # Log preview
         for i, doc in enumerate(child_docs[:3]):
             print(f"     [{i}] ID: {doc.metadata.get('parent_id')} | Content: {doc.page_content[:20]}...")
-
         # 2. Get Parent IDs
         parent_ids = []
         seen = set()
