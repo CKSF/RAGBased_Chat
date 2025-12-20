@@ -15,9 +15,11 @@ def create_app(config_class=Config):
     # Register Blueprints
     from backend.app.api.chat import chat_bp
     from backend.app.api.lesson import lesson_bp
+    from backend.app.api.files import files_bp
     
     app.register_blueprint(chat_bp, url_prefix='/api/chat')
     app.register_blueprint(lesson_bp, url_prefix='/api/lesson')
+    app.register_blueprint(files_bp, url_prefix='/api')
     
     # Health Check
     @app.route('/health')

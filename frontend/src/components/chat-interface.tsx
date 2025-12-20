@@ -8,7 +8,7 @@ import { MessageBubble } from "@/components/message-bubble";
 
 type Mode = "chat" | "lesson";
 
-const GRADES = ["小学", "初中", "高中", "大学", "研究生"];
+const GRADES = ["小学", "初中", "高中", "大学", "硕士", "博士"];
 
 export function ChatInterface() {
   const [mode, setMode] = useState<Mode>("chat");
@@ -37,14 +37,23 @@ export function ChatInterface() {
     // 1. Add User Message
     const newHistory = [
       ...messages,
-      { role: "user", content: userMsg } as ChatMessage,
+      {
+        role: "user",
+        content: userMsg,
+        timestamp: new Date().toISOString()
+      } as ChatMessage,
     ];
     setMessages(newHistory);
 
     // 2. Add Assistant Placeholder (Empty)
     setMessages((prev) => [
       ...prev,
-      { role: "assistant", content: "", thoughts: [] },
+      {
+        role: "assistant",
+        content: "",
+        thoughts: [],
+        timestamp: new Date().toISOString()
+      },
     ]);
 
     // Helper to update the last message state

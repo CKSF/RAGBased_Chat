@@ -3,6 +3,7 @@ export interface ChatMessage {
   content: string;
   sources?: string[];
   thoughts?: string[];
+  timestamp?: string;
 }
 
 export interface ChatResponse {

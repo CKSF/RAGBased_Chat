@@ -12,3 +12,4 @@ chromadb
 volcengine
 openai
 sentence-transformers
+rank_bm25

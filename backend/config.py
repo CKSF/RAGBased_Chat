@@ -12,7 +12,11 @@ class Config:
     VOLC_MODEL = os.getenv('VOLC_MODEL', 'deepseek-r1-250528')
     
     # Lightweight model for fast tasks (query rewriting)
-    VOLC_LITE_MODEL = os.getenv('VOLC_LITE_MODEL', 'doubao-lite-4k')
+    VOLC_LITE_MODEL = os.getenv('VOLC_LITE_MODEL', 'deepseek-r1-250528')
+
+    # RAG Hybrid Search Weights
+    RAG_BM25_WEIGHT = float(os.getenv('RAG_BM25_WEIGHT', '0.5'))
+    RAG_VECTOR_WEIGHT = float(os.getenv('RAG_VECTOR_WEIGHT', '0.5'))
 
     @classmethod
     def validate(cls):

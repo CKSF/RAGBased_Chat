@@ -17,9 +17,15 @@ export function MessageBubble({
   content,
   sources,
   thoughts,
+  timestamp,
 }: ChatMessage) {
   const isUser = role === "user";
   const [isThinkingOpen, setIsThinkingOpen] = useState(true);
+
+  // Format time (e.g., "14:30")
+  const timeString = timestamp
+    ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : "";
 
   return (
     <div
@@ -30,13 +36,24 @@ export function MessageBubble({
     >
       <div
         className={clsx(
-          "flex h-8 w-8 shrink-0 select-none items-center justify-center rounded-md border shadow-sm",
-          isUser
-            ? "bg-white dark:bg-zinc-950"
-            : "bg-black text-white dark:bg-white dark:text-black"
+          "flex flex-col items-center gap-1 shrink-0"
         )}
       >
-        {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+        <div
+          className={clsx(
+            "flex h-8 w-8 select-none items-center justify-center rounded-md border shadow-sm",
+            isUser
+              ? "bg-white dark:bg-zinc-950"
+              : "bg-black text-white dark:bg-white dark:text-black"
+          )}
+        >
+          {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+        </div>
+        {timeString && (
+          <span className="text-[10px] text-zinc-400 font-medium">
+            {timeString}
+          </span>
+        )}
       </div>
 
       <div className="flex-1 space-y-2 overflow-hidden">
@@ -95,12 +112,15 @@ export function MessageBubble({
             </p>
             <div className="flex flex-wrap gap-2">
               {sources.map((source, i) => (
-                <span
+                <a
                   key={i}
-                  className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded-md border border-blue-100 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800"
+                  href={`http://localhost:5000/api/source/${encodeURIComponent(source)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded-md border border-blue-100 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800 hover:underline cursor-pointer transition-colors"
                 >
                   {source}
-                </span>
+                </a>
               ))}
             </div>
           </div>
