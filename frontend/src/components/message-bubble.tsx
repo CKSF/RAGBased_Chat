@@ -27,15 +27,11 @@ mermaid.initialize({
 });
 
 // ----------------------------------------------------------------------
-// 2. Safe Preprocessing (The Fix for Black Box Lists)
+// 2. Safe Preprocessing
 // ----------------------------------------------------------------------
 const preprocessContent = (text: string | undefined) => {
   if (!text) return "";
-
-  // Regex Explanation:
-  // Finds ```markdown [CONTENT] ``` and replaces it with just [CONTENT].
-  // This "peels" the black code block wrapper off your lists.
-  // We strictly target "markdown" or "text" so we don't accidentally break Mermaid blocks.
+  // Removes ```markdown wrappers from lists so they render as HTML
   return text.replace(/```(?:markdown|text)\n([\s\S]*?)\n```/g, "$1");
 };
 
@@ -115,8 +111,10 @@ export function MessageBubble({
   const isUser = role === "user";
   const [isThinkingOpen, setIsThinkingOpen] = useState(true);
 
-  // Apply the fix: Unwrap lists from code blocks
   const displayContent = useMemo(() => preprocessContent(content), [content]);
+
+  const API_BASE_URL =
+    process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
   const timeString = timestamp
     ? new Date(timestamp).toLocaleTimeString([], {
@@ -188,13 +186,14 @@ export function MessageBubble({
             remarkPlugins={[remarkGfm]}
             rehypePlugins={[rehypeRaw]}
             components={{
-              // Custom Code Renderer
-              code: ({ node, inline, className, children, ...props }) => {
+              // FIXED: Added 'any' type to 'props' to fix the TS error
+              code: (props: any) => {
+                const { inline, className, children } = props;
                 const match = /language-(\w+)/.exec(className || "");
                 const lang = match ? match[1] : "";
                 const codeString = String(children).replace(/\n$/, "");
 
-                // 1. Detect Mermaid (Graph/Flowchart)
+                // 1. Detect Mermaid
                 const isMermaid =
                   lang === "mermaid" ||
                   (!inline &&
@@ -206,7 +205,7 @@ export function MessageBubble({
                   return <MermaidDiagram content={codeString} />;
                 }
 
-                // 2. Default Code Block (for standard code)
+                // 2. Default Code Block
                 return (
                   <code className={className} {...props}>
                     {children}
@@ -233,7 +232,7 @@ export function MessageBubble({
               {sources.map((source, i) => (
                 <a
                   key={i}
-                  href={`http://localhost:5000/api/source/${encodeURIComponent(
+                  href={`${API_BASE_URL}/api/source/${encodeURIComponent(
                     source
                   )}`}
                   target="_blank"

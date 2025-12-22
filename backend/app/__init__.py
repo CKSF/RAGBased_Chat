@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory, abort # <--- 1. Add imports
 from flask_cors import CORS
 from backend.config import Config
 import os
@@ -6,6 +6,9 @@ import os
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
+    
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    DATA_FOLDER = os.path.join(BASE_DIR, '..', '..', 'data')
     
     # Custom CORS to allow custom header for AuthGate
     CORS(app, resources={r"/*": {"origins": "*"}}, 
@@ -26,6 +29,13 @@ def create_app(config_class=Config):
     def health_check():
         return {"status": "ok", "service": "sizheng-backend"}
     
+    @app.route('/api/source/<path:filename>')
+    def serve_source(filename):
+        try:
+            return send_from_directory(DATA_FOLDER, filename)
+        except FileNotFoundError:
+            return abort(404)
+        
     # ✅ NEW: Verification Route for Frontend AuthGate
     @app.route('/api/verify', methods=['POST'])
     def verify_token():
