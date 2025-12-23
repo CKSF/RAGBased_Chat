@@ -171,7 +171,20 @@ ACCESS_PASSWORD=请联系负责人
 
 #### 上传新文档
 1. 使用scp将文档存入服务器的 data/ 目录。目标位置为公网IP。
-2. 重建索引：运行以下命令调用容器内的环境进行构建（支持进度条显示）：<br/>
+2. 或者:
+```
+rsync -avzP \                    
+  --exclude 'chroma_db' \
+  --exclude 'data' \
+  --exclude 'doc_store' \
+  --exclude 'documentation' \
+  --exclude '__pycache__' \
+  --exclude 'node_modules' \
+  --exclude '.git' \
+  --exclude '.next' \
+  ./ root@xx.xxx.xx.xxx:/root/opt/RAGBased_Chat
+```
+4. 重建索引：运行以下命令调用容器内的环境进行构建（支持进度条显示）：<br/>
   ```sudo docker compose run --rm -v "$(pwd)/build_db.py:/app/build_db.py" backend python build_db.py```
 5. 加载生效：重启后端服务以加载新数据库：<br/>
   ```sudo docker compose restart backend```
@@ -187,6 +200,7 @@ ACCESS_PASSWORD=请联系负责人
 3. 单独更新服务
 - 更新前端（修改了页面 UI 或 API 地址）：```sudo docker compose up -d --build frontend```
 - 更新后端（修改了 Python 代码或路由）：```sudo docker compose restart backend```
+- 更新后端依赖：```sudo docker compose build --no-cache backend```
 
 4. 停止服务: ```sudo docker compose down```
 
