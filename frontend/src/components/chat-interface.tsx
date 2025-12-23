@@ -8,7 +8,7 @@ import { MessageBubble } from "@/components/message-bubble";
 
 type Mode = "chat" | "lesson";
 
-const GRADES = ["小学", "初中", "高中", "大学", "硕士", "博士"];
+const GRADES = ["通用", "小学", "初中", "高中", "大学", "硕士", "博士"];
 
 export function ChatInterface() {
   const [mode, setMode] = useState<Mode>("chat");
@@ -17,7 +17,7 @@ export function ChatInterface() {
 
   // Inputs
   const [input, setInput] = useState("");
-  const [grade, setGrade] = useState("大学");
+  const [grade, setGrade] = useState("通用");
 
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -40,7 +40,7 @@ export function ChatInterface() {
       {
         role: "user",
         content: userMsg,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       } as ChatMessage,
     ];
     setMessages(newHistory);
@@ -52,7 +52,7 @@ export function ChatInterface() {
         role: "assistant",
         content: "",
         thoughts: [],
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       },
     ]);
 
@@ -87,7 +87,7 @@ export function ChatInterface() {
     try {
       if (mode === "chat") {
         // CHAT STREAMING
-        await api.streamMessage(userMsg, newHistory, updateLastMessage);
+        await api.streamMessage(userMsg, newHistory, grade, updateLastMessage);
       } else {
         // LESSON STREAMING
         // Pass the grade state here
@@ -109,12 +109,9 @@ export function ChatInterface() {
 
   return (
     <div className="flex flex-col h-[85vh] w-full max-w-4xl mx-auto bg-white dark:bg-zinc-900 shadow-xl rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800">
-      {/* Header / Mode Switcher */}
-      {/* Header / Mode Switcher */}
+      {/* Header logic remains the same... */}
       <div className="border-b border-zinc-200 dark:border-zinc-800 p-4 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md sticky top-0 z-10">
         <div className="relative flex p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg max-w-[320px] mx-auto">
-          {/* Sliding background visual (Optional simple CSS version) */}
-
           <button
             onClick={() => setMode("chat")}
             className={clsx(
@@ -132,7 +129,6 @@ export function ChatInterface() {
             />
             智能答疑
           </button>
-
           <button
             onClick={() => setMode("lesson")}
             className={clsx(
@@ -153,27 +149,21 @@ export function ChatInterface() {
         </div>
       </div>
 
-      {/* Chat Area - This will now scroll because parent has fixed height */}
+      {/* Messages Area... */}
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-zinc-400 space-y-4">
-            <div className="p-4 bg-zinc-100 dark:bg-zinc-800 rounded-full">
-              {mode === "chat" ? (
-                <Sparkles className="w-8 h-8" />
-              ) : (
-                <BookOpen className="w-8 h-8" />
-              )}
-            </div>
+            {/* ... icons ... */}
             <p className="text-lg font-medium">
-              {mode === "chat" ? "有什么可以帮你的吗？" : "请输入主题生成教案"}
+              {mode === "chat"
+                ? "有什么思政问题可以帮你的吗？"
+                : "请输入主题生成教案"}
             </p>
           </div>
         )}
-
         {messages.map((msg, idx) => (
           <MessageBubble key={idx} {...msg} />
         ))}
-
         {isLoading && (
           <div className="flex items-center gap-2 text-zinc-500 p-4">
             <Loader2 className="w-5 h-5 animate-spin" />
@@ -189,20 +179,18 @@ export function ChatInterface() {
           onSubmit={handleSubmit}
           className="relative flex gap-3 max-w-3xl mx-auto"
         >
-          {/* Grade Selector (Only in Lesson Mode) */}
-          {mode === "lesson" && (
-            <select
-              value={grade}
-              onChange={(e) => setGrade(e.target.value)}
-              className="h-12 px-3 rounded-lg border border-zinc-200 bg-zinc-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-zinc-800 dark:border-zinc-700"
-            >
-              {GRADES.map((g) => (
-                <option key={g} value={g}>
-                  {g}
-                </option>
-              ))}
-            </select>
-          )}
+          {/* UPDATE: Grade Selector is now ALWAYS visible (or based on your preference) */}
+          <select
+            value={grade}
+            onChange={(e) => setGrade(e.target.value)}
+            className="h-12 px-3 rounded-lg border border-zinc-200 bg-zinc-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-zinc-800 dark:border-zinc-700"
+          >
+            {GRADES.map((g) => (
+              <option key={g} value={g}>
+                {g}
+              </option>
+            ))}
+          </select>
 
           <input
             type="text"
@@ -210,8 +198,8 @@ export function ChatInterface() {
             onChange={(e) => setInput(e.target.value)}
             placeholder={
               mode === "chat"
-                ? "输入问题... (Shift+Enter换行)"
-                : "输入课程主题 (例如: 高质量发展)..."
+                ? "输入问题... (例：何为高质量发展)"
+                : "输入课程主题..."
             }
             className="flex-1 h-12 px-4 rounded-lg border border-zinc-200 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-zinc-800 dark:border-zinc-700"
           />
@@ -225,11 +213,7 @@ export function ChatInterface() {
             {isLoading ? "生成中" : "发送"}
           </button>
         </form>
-        <p className="text-center text-xs text-zinc-400 mt-2">
-          {mode === "chat"
-            ? "AI 基于 RAG 知识库回答，可能存在误差。"
-            : "教案由大模型生成，建议人工审核后使用。"}
-        </p>
+        {/* Footer text... */}
       </div>
     </div>
   );
