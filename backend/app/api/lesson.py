@@ -17,14 +17,14 @@ def generate_lesson_plan():
     """
     req_data = request.json
     topic = req_data.get('topic', '')
-    grade = req_data.get('grade', '不限')
+    grade = req_data.get('grade', '通用')
 
     # --- 1. Construct RAG Filters based on Grade ---
     # We must map the user's input grade to the specific tags used in build_db.py
     # Valid tags: "小学", "初中", "高中", "大学", "硕士", "博士"
     rag_filters = {}
     
-    if grade and grade != '不限':
+    if grade and grade != '通用':
         # Simple substring matching ensures that "小学五年级" -> filter: "小学"
         if "小学" in grade:
             rag_filters = {"grade": "小学"}
