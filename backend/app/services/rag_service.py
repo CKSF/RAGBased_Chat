@@ -209,7 +209,7 @@ class RAGService:
             self.vector_store.add_documents(children_to_index)
             # Re-init BM25 to include new docs (simple approach)
             # In high-load prod, you'd want to do this async or less frequently
-            self._init_hybrid_retriever()
+            # self._init_hybrid_retriever()
 
     def query(self, question: str, k: int = 5, filters: Optional[Dict[str, Any]] = None) -> List[Document]:
         """
@@ -227,13 +227,13 @@ class RAGService:
 
         # --- Step 1: Configure Chroma Native Filters ---
         # This optimizes the Vector Search part
-        if filters:
-            # Chroma expects filter dict: {"metadata_field": "value"}
-            self.chroma_retriever.search_kwargs["filter"] = filters
-        else:
-            # Clear previous filters if any
-            if "filter" in self.chroma_retriever.search_kwargs:
-                del self.chroma_retriever.search_kwargs["filter"]
+        # if filters:
+        #     # Chroma expects filter dict: {"metadata_field": "value"}
+        #     self.chroma_retriever.search_kwargs["filter"] = filters
+        # else:
+        #     # Clear previous filters if any
+        #     if "filter" in self.chroma_retriever.search_kwargs:
+        #         del self.chroma_retriever.search_kwargs["filter"]
         
         # Set K for retrievers (fetching more initially to allow for post-filtering of BM25 results)
         fetch_k = k * 3  
