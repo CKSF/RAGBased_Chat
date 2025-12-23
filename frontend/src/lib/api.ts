@@ -39,7 +39,7 @@ export const api = {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...getAuthHeader()
+        ...getAuthHeader(),
       },
       body: JSON.stringify({ message, history }),
     });
@@ -48,7 +48,7 @@ export const api = {
       try {
         const json = JSON.parse(errorText);
         if (json.error) errorText = json.error;
-      } catch { }
+      } catch {}
       throw new Error(`API Error ${res.status}: ${errorText}`);
     }
     return res.json() as Promise<ChatResponse>;
@@ -59,7 +59,7 @@ export const api = {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...getAuthHeader()
+        ...getAuthHeader(),
       },
       body: JSON.stringify({ topic, grade }),
     });
@@ -68,7 +68,7 @@ export const api = {
       try {
         const json = JSON.parse(errorText);
         if (json.error) errorText = json.error;
-      } catch { }
+      } catch {}
       throw new Error(`API Error ${res.status}: ${errorText}`);
     }
     return res.json() as Promise<LessonResponse>;
@@ -78,18 +78,19 @@ export const api = {
   async streamMessage(
     message: string,
     history: ChatMessage[],
+    grade: string,
     onUpdate: (chunk: Partial<ChatMessage>) => void
   ) {
     // Keep strict typing from HEAD
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      ...getAuthHeader()
+      ...getAuthHeader(),
     };
 
     const response = await fetch(`${API_BASE}/api/chat/send`, {
       method: "POST",
       headers, // ✅ Pass as strictly typed object
-      body: JSON.stringify({ message, history }),
+      body: JSON.stringify({ message, history, grade }),
     });
 
     if (!response.body) throw new Error("No response body");
@@ -142,7 +143,7 @@ export const api = {
     // Keep strict typing from HEAD
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      ...getAuthHeader()
+      ...getAuthHeader(),
     };
 
     const response = await fetch(`${API_BASE}/api/lesson/generate`, {
