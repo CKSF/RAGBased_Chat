@@ -65,19 +65,45 @@ def send_message():
                 yield format_sse('thought', f"✅ 检索完成：找到 {doc_count} 份相关文档。")
                 yield format_sse('thought', f"📄 参考来源: {', '.join(sources)}")
                 
-                context_text = ""
+                # --- GROUP DOCUMENTS BY SOURCE ---
+                # Key: source_name, Value: list of docs
+                grouped_docs = {}
                 for doc in documents:
-                    # Display Grade in Context so LLM sees it
-                    doc_grade = doc.metadata.get('grade', '通用')
-                    context_text += f"\n---\n[Source: {doc.metadata.get('source')} | 适用: {doc_grade}]\n{doc.page_content}\n"
+                    src = doc.metadata.get('source', 'Unknown')
+                    if src not in grouped_docs:
+                        grouped_docs[src] = []
+                    grouped_docs[src].append(doc)
+                
+                context_text = ""
+                # Iterate through unique sources (giving each a Book ID)
+                for i, (source_name, docs) in enumerate(grouped_docs.items()):
+                    # Take metadata from first doc of the group
+                    first_meta = docs[0].metadata
+                    doc_grade = first_meta.get('grade', '通用')
+                    
+                    # Header for the Book
+                    context_text += f"\n【资料 {i+1}】《{source_name}》 (适用: {doc_grade})\n"
+                    
+                    # List content for each page/chunk in this book
+                    for sub_doc in docs:
+                        sub_page = sub_doc.metadata.get('page', '?')
+                        # Format: [第 5 页]: Content
+                        context_text += f"   - [第 {sub_page} 页]: {sub_doc.page_content}\n"
+                    
+                    context_text += "\n"
 
             # --- STEP 4: LLM GENERATION ---
+            print(f"\n[DEBUG] Context Sent to LLM:\n{context_text}\n[END DEBUG]\n")
             yield format_sse('thought', "🧠 正在进行事实核查与答案生成...")
             
-
             
             system_prompt = (
-    "你是一个极其严谨的思政课助教大模型。你的核心任务是基于【背景资料】回答问题。\n"
+    "你是一个极其严谨的思政课助教大模型（专注问答与概念解析）。\n"
+    "你的核心任务是基于【背景资料】直接回答用户的问题，提供清晰、流畅的解释。\n\n"
+    "### ⚠️ 身份与格式严格限制 (Identity & Format Constraints)\n"
+    "1. **角色定义**：你现在是**问答助手**，不是教案生成器。\n"
+    "2. **严禁输出教案结构**：**绝对禁止**使用“教学目标”、“教学重难点”、“教学过程”、“板书设计”、“课后作业”等教案专用格式。\n"
+    "3. **文风要求**：请使用通顺的段落进行说明（Explanatory Paragraphs）。不要罗列过多的知识点大纲，而是要把逻辑讲清楚。\n\n"
     "为了确保信息的绝对准确性，你必须**严格区分**“资料库内容”与“通用推理内容”。\n\n"
     "在回答之前，请先判断提供的【背景资料】是否能回答用户的问题：\n\n"
     "**情况一：资料高度相关**\n"
@@ -89,26 +115,32 @@ def send_message():
     "### 核心铁律（违反即视为严重错误）：\n"
     "1. **优先原文**：回答必须基于 背景资料(Context) 内容。如果 背景资料(Context) 包含确切答案，请直接引用。\n"
     "2. **严禁编造**：如果资料中没有答案，必须诚实说明。如果用户问“红军长征”，而资料里全是“改革开放”，请直接按【情况二】处理，绝对不要强行把改革开放的内容套用到长征上。如果不确定，就说不知道。\n"
-    "3. **严禁捏造直接引用**：如果要加入直接引用，必须确认引用内容是背景资料中的原文，严禁出现任何使用通用知识补充、自由发挥和自行捏造的引用。直接引用在回答中最多出现三次，且根据你确定发生过的可验证的直接引用排序。引用必须带有信息来源的标注（如：根据《...》）。如果背景资料中没有一模一样的句子，**绝对不要**使用引号 `“...”`。\n"
-    "5. **精准匹配原则**：只有当背景资料中存在**逐字逐句完全一致**的文本时，才被允许称为“原文引用”。\n"
-    f"6. 年级严格限制：当前设定的目标用户年级为【{grade}】。或者如果用户提到了目标年级（例如“大学生”、“小学生”、或者“小学四年级”时）"
-                "   - 如果是小学：**严禁**出现初中/高中/大学/研究生/博士的复杂的政治术语、哲学概念或过深的理论分析。\n"
-                "   - 如果是大学：**严禁**使用低幼化的语言或简单的生活案例。\n"
-                "   - **绝对禁止**发生“年级泄漏”（如：明明是五年级教案，却引用了六年级或初中的课标要求）。低年级教案禁止使用一切来源自高年级的资料，包括概念、教案、案例、演示等一切模态的信息。\n"
-    "### 🖊️ 输出结构强制要求 (必须完全遵守)：\n"
-                "请将你的回答严格划分为两个部分（如果无相关资料，直接跳到第二部分并加粗声明）：\n\n"
-                
-                "#### 第一部分：📚 知识库精准依据 (Evidence Base)\n"
-                "- 在此部分，**仅**列出背景资料中与问题直接相关的**原句**或**核心事实**。\n"
-                "- 格式：使用无序列表 `* ...`。\n"
-                "- 如果想引用原文，必须保证是**Ctrl+C / Ctrl+V**级别的完全一致。\n"
-                "- 每一条必须标注来源，例如：*(来源：)*。\n"
-                "- **如果没有找到直接相关的原文引用，请直接写：“❌ 未在知识库中找到直接原文引用。”**（不要硬凑）。\n\n"
-                
-                "#### 第二部分：💡 综合解答与助教解析 (Analysis & Answer)\n"
-                "- 在此部分，基于第一部分的证据，结合你的教学逻辑，回答用户的问题。\n"
-                "- 如果第一部分没有证据，你必须在段首加粗声明：**【注：以下内容基于通用教学知识补充，未在当前知识库中找到直接依据，仅供参考。】**\n"
-                "- 语言风格：严谨、积极、符合目标年级认知。\n"
+    "3. **强制索引引用 (Strict Indexing)**：这是最重要的规则。\n"
+    "   - 当你引用背景资料中的内容时，**必须**在句末标注来源索引，格式为 `[1]` 或 `[2]`。\n"
+    "3. **强制索引引用 (Strict Indexing)**：\n"
+    "   - 在正文回答中，请使用 **`《文件名》[ID](第X页)`** 或者 **简单的 `[ID]`** (如果该ID在第一部分Evidence Base已明确列出)。\n"
+    "   - 推荐在正文综合分析时，使用简单的 `[ID]` 来保持流畅度，但第一次引用某书时最好带上书名。\n"
+    
+    "### 🖊️ 输出结构强制要求 (必须完全遵守):\n"
+    "请将你的回答严格划分为两个部分：\n\n"
+    
+    "#### 第一部分：📚 知识库精准依据 (Evidence Base)\n"
+    "**必须按来源书籍分组展示**，格式如下 (严禁错乱)：\n"
+    "**《书籍名称 A》【1】**:\n"
+    "1. \"...引用原文片段...\" (第 5 页)\n"
+    "2. \"...引用原文片段...\" (第 12 页)\n\n"
+    "**《书籍名称 B》【2】**:\n"
+    "1. \"...引用原文片段...\" (第 8 页)\n\n"
+    "- 必须完全基于提供的【资料 1】、【资料 2】上下文来生成此部分。\n"
+    "- 每一条引用必须精确到页码。\n\n"
+    
+    "#### 第二部分：💡 综合解答与助教解析 (Analysis & Answer)\n"
+    "- 在此部分，基于第一部分的证据，结合你的教学逻辑，回答用户的问题。\n"
+    "- **使用引用索引**：当用到上述证据时，使用 `【1】` 或 `【2】` 标注。\n"
+    "- **引用位置**：引用编号必须放在**句号之后**。\n"
+    "  - ✅ 正确：...促进人的全面发展。【1】\n"
+    "  - ❌ 错误：...促进人的全面发展[1]。\n"
+    "- 语言风格：严谨、积极、符合目标年级认知。\n"
     "### 格式强制规范 (Critical Output Rules)：\n"
     "由于前端显示限制，**系统无法渲染任何图表代码**。你必须严格遵守以下规则：\n"
     "1. **结构化降级处理**：\n"
@@ -119,14 +151,26 @@ def send_message():
     "   - 严禁输出任何 ```mermaid, ```flowchart, ```graph, ```pie 等代码块。\n"
     "   - 严禁输出 `<svg>` 标签。\n"
     "   - 输出内容必须是直接可读的纯文本 Markdown。"
-    f"\n\n### 背景资料 (Context):\n{context_text}"
+    f"\n\n### 背景资料 (Indexed Context):\n{context_text}"
 )
 
             # Stream the actual text token-by-token
             for token in llm_service.stream_response(user_message, system_prompt, history):
                 yield format_sse('token', token)
             
-            yield format_sse('done', {"sources": sources})
+            # Construct Rich Citations
+            rich_citations = []
+            if documents:
+                 for doc in documents:
+                    meta = doc.metadata
+                    rich_citations.append({
+                        "source": meta.get('source', 'Unknown'),
+                        "page": meta.get('page', '?'),
+                        "grade": meta.get('grade', '通用'),
+                        "content": doc.page_content[:300] + "..." # Snippet for preview
+                    })
+
+            yield format_sse('done', {"sources": rich_citations})
 
         except Exception as e:
             traceback.print_exc()

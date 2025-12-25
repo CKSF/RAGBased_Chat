@@ -1,20 +1,28 @@
+// New Rich Citation Interface
+export interface Citation {
+  source: string;
+  page?: number | string;
+  grade?: string;
+  content?: string;
+}
+
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
-  sources?: string[];
+  sources?: Citation[]; // Changed from string[]
   thoughts?: string[];
   timestamp?: string;
 }
 
 export interface ChatResponse {
   reply: string;
-  sources: string[];
+  sources: Citation[];
   context_used?: string;
 }
 
 export interface LessonResponse {
   lesson_plan: string;
-  sources: string[];
+  sources: Citation[];
 }
 
 // ✅ Fix: Return explicit Record type
@@ -48,7 +56,7 @@ export const api = {
       try {
         const json = JSON.parse(errorText);
         if (json.error) errorText = json.error;
-      } catch {}
+      } catch { }
       throw new Error(`API Error ${res.status}: ${errorText}`);
     }
     return res.json() as Promise<ChatResponse>;
@@ -68,7 +76,7 @@ export const api = {
       try {
         const json = JSON.parse(errorText);
         if (json.error) errorText = json.error;
-      } catch {}
+      } catch { }
       throw new Error(`API Error ${res.status}: ${errorText}`);
     }
     return res.json() as Promise<LessonResponse>;

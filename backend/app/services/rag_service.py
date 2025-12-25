@@ -196,7 +196,7 @@ class RAGService:
                 
                 # [CRITICAL] Propagate specific metadata (like 'grade') to children
                 # This ensures the Vector Store filters can see the grade
-                for key in ["source", "grade", "topic"]: 
+                for key in ["source", "grade", "topic", "page"]: 
                     if key in metadata:
                         c_doc.metadata[key] = metadata[key]
                         

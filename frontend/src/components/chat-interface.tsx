@@ -12,55 +12,84 @@ const GRADES = ["通用", "小学", "初中", "高中", "大学", "硕士", "博
 
 export function ChatInterface() {
   const [mode, setMode] = useState<Mode>("chat");
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [histories, setHistories] = useState<Record<Mode, ChatMessage[]>>({
+    chat: [],
+    lesson: [],
+  });
 
-  // Inputs
-  const [input, setInput] = useState("");
-  const [grade, setGrade] = useState("通用");
+  // Derived state for current view
+  const messages = histories[mode];
+
+  // Independent Loading States
+  const [loadingStates, setLoadingStates] = useState<Record<Mode, boolean>>({
+    chat: false,
+    lesson: false,
+  });
+
+  // Independent Inputs
+  const [inputs, setInputs] = useState<Record<Mode, string>>({
+    chat: "",
+    lesson: "",
+  });
+
+  // Independent Grades
+  const [grades, setGrades] = useState<Record<Mode, string>>({
+    chat: "通用",
+    lesson: "通用",
+  });
 
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, mode]); // Trigger scroll on message add OR mode switch
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!input.trim() || isLoading) return;
+    const currentMode = mode; // Capture mode for closure
+    const currentInput = inputs[currentMode];
 
-    const userMsg = input.trim();
-    setInput("");
-    setIsLoading(true);
+    if (!currentInput.trim() || loadingStates[currentMode]) return;
 
-    // 1. Add User Message
-    const newHistory = [
-      ...messages,
-      {
-        role: "user",
-        content: userMsg,
-        timestamp: new Date().toISOString(),
-      } as ChatMessage,
-    ];
-    setMessages(newHistory);
+    const userMsg = currentInput.trim();
 
-    // 2. Add Assistant Placeholder (Empty)
-    setMessages((prev) => [
+    // Clear Input for THIS mode
+    setInputs((prev) => ({ ...prev, [currentMode]: "" }));
+
+    // Set Loading for THIS mode
+    setLoadingStates((prev) => ({ ...prev, [currentMode]: true }));
+
+    // 1. Add User Message & Assistant Placeholder atomically
+    const userMessage: ChatMessage = {
+      role: "user",
+      content: userMsg,
+      timestamp: new Date().toISOString(),
+    };
+
+    setHistories((prev) => ({
       ...prev,
-      {
-        role: "assistant",
-        content: "",
-        thoughts: [],
-        timestamp: new Date().toISOString(),
-      },
-    ]);
+      [currentMode]: [
+        ...prev[currentMode],
+        userMessage,
+        {
+          role: "assistant",
+          content: "",
+          thoughts: [],
+          timestamp: new Date().toISOString(),
+        } as ChatMessage,
+      ],
+    }));
 
-    // Helper to update the last message state
+
+    // Helper to update the last message state OF THE CURRENT MODE
     const updateLastMessage = (chunk: Partial<ChatMessage>) => {
-      setMessages((prev) => {
-        const last = prev[prev.length - 1];
-        const others = prev.slice(0, -1);
+      setHistories((prev) => {
+        const currentList = prev[currentMode];
+        if (currentList.length === 0) return prev; // Should not happen
+
+        const last = currentList[currentList.length - 1];
+        const others = currentList.slice(0, -1);
 
         // Merge thoughts (append to array)
         const newThoughts = chunk.thoughts
@@ -72,38 +101,52 @@ export function ChatInterface() {
           ? last.content + chunk.content
           : last.content;
 
-        return [
-          ...others,
-          {
-            ...last,
-            content: newContent,
-            thoughts: newThoughts,
-            sources: chunk.sources || last.sources,
-          },
-        ];
+        const updatedLast = {
+          ...last,
+          content: newContent,
+          thoughts: newThoughts,
+          sources: chunk.sources || last.sources,
+        };
+
+        return {
+          ...prev,
+          [currentMode]: [...others, updatedLast],
+        };
       });
     };
 
     try {
-      if (mode === "chat") {
+      const currentGrade = grades[currentMode];
+
+      if (currentMode === "chat") {
         // CHAT STREAMING
-        await api.streamMessage(userMsg, newHistory, grade, updateLastMessage);
+        // Note: We use the *updated* history logic. 
+        // Ideally we pass the history *including* the new user message.
+        // But since state might not update immediately, we construct the 'sent' history manually.
+        // However, `messages` in component scope is old. 
+        // We need to pass the history intended for the backend.
+        const historyForBackend = [...histories['chat'], userMessage];
+
+        await api.streamMessage(userMsg, historyForBackend, currentGrade, updateLastMessage);
       } else {
         // LESSON STREAMING
         // Pass the grade state here
-        await api.streamLessonPlan(userMsg, grade, updateLastMessage);
+        await api.streamLessonPlan(userMsg, currentGrade, updateLastMessage);
       }
     } catch (error) {
       console.error(error);
-      setMessages((prev) => {
-        const last = prev[prev.length - 1];
-        return [
-          ...prev.slice(0, -1),
-          { ...last, content: last.content + `\n\n❌ Error: ${error}` },
-        ];
+      setHistories((prev) => {
+        const currentList = prev[currentMode];
+        const last = currentList[currentList.length - 1];
+        const others = currentList.slice(0, -1);
+
+        return {
+          ...prev,
+          [currentMode]: [...others, { ...last, content: last.content + `\n\n❌ Error: ${error}` }],
+        };
       });
     } finally {
-      setIsLoading(false);
+      setLoadingStates((prev) => ({ ...prev, [currentMode]: false }));
     }
   };
 
@@ -164,7 +207,7 @@ export function ChatInterface() {
         {messages.map((msg, idx) => (
           <MessageBubble key={idx} {...msg} />
         ))}
-        {isLoading && (
+        {loadingStates[mode] && (
           <div className="flex items-center gap-2 text-zinc-500 p-4">
             <Loader2 className="w-5 h-5 animate-spin" />
             <span className="text-sm">正在思考中...</span>
@@ -181,8 +224,8 @@ export function ChatInterface() {
         >
           {/* UPDATE: Grade Selector is now ALWAYS visible (or based on your preference) */}
           <select
-            value={grade}
-            onChange={(e) => setGrade(e.target.value)}
+            value={grades[mode]}
+            onChange={(e) => setGrades(prev => ({ ...prev, [mode]: e.target.value }))}
             className="h-12 px-3 rounded-lg border border-zinc-200 bg-zinc-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-zinc-800 dark:border-zinc-700"
           >
             {GRADES.map((g) => (
@@ -194,8 +237,8 @@ export function ChatInterface() {
 
           <input
             type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
+            value={inputs[mode]}
+            onChange={(e) => setInputs(prev => ({ ...prev, [mode]: e.target.value }))}
             placeholder={
               mode === "chat"
                 ? "输入问题... (例：何为高质量发展)"
@@ -206,11 +249,11 @@ export function ChatInterface() {
 
           <button
             type="submit"
-            disabled={!input.trim() || isLoading}
+            disabled={!inputs[mode].trim() || loadingStates[mode]}
             className="h-12 px-6 rounded-lg bg-black text-white font-medium hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors dark:bg-white dark:text-black dark:hover:bg-zinc-200 flex items-center gap-2"
           >
             <Send className="w-4 h-4" />
-            {isLoading ? "生成中" : "发送"}
+            {loadingStates[mode] ? "生成中" : "发送"}
           </button>
         </form>
         {/* Footer text... */}

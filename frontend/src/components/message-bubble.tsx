@@ -118,9 +118,9 @@ export function MessageBubble({
 
   const timeString = timestamp
     ? new Date(timestamp).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
+      hour: "2-digit",
+      minute: "2-digit",
+    })
     : "";
 
   return (
@@ -222,29 +222,60 @@ export function MessageBubble({
           )}
         </div>
 
-        {/* Sources Footer */}
-        {sources && sources.length > 0 && (
-          <div className="mt-4 pt-3 border-t border-zinc-200 dark:border-zinc-700/50">
-            <p className="text-xs font-semibold text-zinc-500 mb-2">
-              📚 参考资料:
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {sources.map((source, i) => (
-                <a
-                  key={i}
-                  href={`${API_BASE_URL}/api/source/${encodeURIComponent(
-                    source
-                  )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded-md border border-blue-100 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800 hover:underline cursor-pointer transition-colors"
-                >
-                  {source}
-                </a>
-              ))}
+        {/* Rich Sources Footer (Evidence Cards) - Grouped by Source */}
+        {sources && sources.length > 0 && (() => {
+          // GROUPING LOGIC: Group sources by filename (source property)
+          const groupedSources: Record<string, { pages: Set<string | number>, grade?: string }> = {};
+
+          sources.forEach(s => {
+            if (typeof s === 'string') {
+              // Backward compatibility for old string sources
+              if (!groupedSources[s]) groupedSources[s] = { pages: new Set() };
+            } else {
+              if (!groupedSources[s.source]) groupedSources[s.source] = { pages: new Set(), grade: s.grade };
+              if (s.page) groupedSources[s.source].pages.add(s.page);
+            }
+          });
+
+          return (
+            <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700/50">
+              <p className="text-xs font-semibold text-zinc-500 mb-3 flex items-center gap-2">
+                <span className="bg-blue-100 text-blue-600 p-1 rounded">📚</span>
+                参考资料与证据链 (Evidence Chain):
+              </p>
+              <div className="grid grid-cols-1 gap-2">
+                {Object.entries(groupedSources).map(([sourceName, data], i) => (
+                  <div
+                    key={i}
+                    className="group relative flex flex-col items-start p-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
+                  >
+                    {/* Header: Source Name Only */}
+                    <div className="flex flex-wrap items-center gap-2 w-full">
+                      {/* Index Badge */}
+                      <span className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-100 text-blue-600 text-[10px] font-bold shrink-0">
+                        {i + 1}
+                      </span>
+
+                      {/* Filename */}
+                      <span className="text-sm font-medium text-zinc-700 dark:text-zinc-200 truncate flex-1 min-w-[150px]">
+                        {sourceName}
+                      </span>
+                    </div>
+
+                    {/* Link to Source File */}
+                    <a
+                      href={`${API_BASE_URL}/api/source/${encodeURIComponent(sourceName)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="absolute inset-0 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      aria-label={`View source ${sourceName}`}
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );

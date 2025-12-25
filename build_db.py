@@ -27,7 +27,7 @@ def detect_grade(filename: str) -> str:
 
 def build_knowledge_base():
     print("\n" + "="*50)
-    print("🚀 STARTING DATABASE BUILD (With Metadata Tagging)")
+    print("🚀 STARTING DATABASE BUILD (With Page-Level Metadata)")
     print("="*50)
 
     # 1. CLEANUP
@@ -93,44 +93,64 @@ def build_knowledge_base():
         print(f"   🏷️  Detected Grade: [{grade_tag}]")
         
         try:
-            print("   [1/3] Extracting text...", end=" ", flush=True)
+            print("   [1/3] Extracting text with metadata...", end=" ", flush=True)
+            documents = [] # List[Dict]
+            
             if filename.lower().endswith(".pdf"):
-                text = PDFService.extract_text(absolute_path)
+                documents = PDFService.extract_text(absolute_path)
             elif filename.lower().endswith(".docx"):
-                text = DocxService.extract_text(absolute_path)
-            print("Done.")
+                documents = DocxService.extract_text(absolute_path)
+            
+            print(f"Done. Found {len(documents)} pages/chunks.")
 
-            if not text:
-                print("   ⚠️ [WARN] Extracted text is empty. Skipping.")
+            if not documents:
+                print("   ⚠️ [WARN] Extracted content is empty. Skipping.")
                 continue
             
-            total_chars = len(text)
-            print(f"   [2/3] Total Length: {total_chars} characters.")
+            print(f"   [2/3] Sending to ChromaDB...")
             
-            print(f"   [3/3] Sending to ChromaDB in batches...")
+            total_pages = len(documents)
+            previous_tail = ""  # Buffer for cross-page context
+            OVERLAP_SIZE = 300  # Characters to carry over
             
-            batch_size = 1000 
-            chunks = [text[i:i+batch_size] for i in range(0, len(text), batch_size)]
-            total_batches = len(chunks)
-
-            for b_idx, chunk in enumerate(chunks):
-                percent = ((b_idx + 1) / total_batches) * 100
-                print(f"\r        Batch {b_idx+1}/{total_batches} [{percent:.1f}%] ...", end="", flush=True)
+            for p_idx, doc_item in enumerate(documents):
+                raw_text = doc_item['page_content']
+                page_meta = doc_item['metadata'] # {"page": x}
                 
-                # [CRITICAL] Inject Grade Metadata Here
-                rag.add_documents(chunk, metadata={
+                # [CRITICAL] Context Continuity
+                # Prepend the tail of the previous page to the current page.
+                # This ensures that sentences split across pages are not lost in retrieval.
+                text_with_context = previous_tail + "\n" + raw_text if previous_tail else raw_text
+                
+                # Combine Global Metadata (Source, Grade) with Local Metadata (Page)
+                combined_meta = {
                     "source": filename,
-                    "grade": grade_tag  # <--- This saves the tag to the DB
-                })
+                    "grade": grade_tag,
+                    **page_meta
+                }
                 
-                time.sleep(0.05) 
-
-            print("\n        ✅ File Completed.")
+                rag.add_documents(text_with_context, metadata=combined_meta)
+                
+                # Update buffer for next iteration
+                # Take the last N characters of *original* raw_text (not the combined one)
+                if len(raw_text) > OVERLAP_SIZE:
+                    previous_tail = raw_text[-OVERLAP_SIZE:]
+                else:
+                    previous_tail = raw_text # Keep whole text if small
+                
+                # Progress bar
+                if p_idx % 5 == 0:
+                    print(f"\r        Processed Page {p_idx+1}/{total_pages} ...", end="", flush=True)
+            
+            print(f"\r        Processed Page {total_pages}/{total_pages} ... Done.")
+            print("        ✅ File Completed.")
             success_count += 1
             
         except Exception as e:
             print(f"\n   ❌ [ERROR] Failed processing {filename}")
             print(f"   Error details: {e}")
+            import traceback
+            traceback.print_exc()
 
     # 4. FINAL VERIFICATION
     print("\n" + "="*50)
