@@ -31,10 +31,22 @@ def create_app(config_class=Config):
     
     @app.route('/api/source/<path:filename>')
     def serve_source(filename):
+        # Path to your existing placeholder
+        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+        PLACEHOLDER_PATH = os.path.join(BASE_DIR, 'static', 'placeholder.html')
+
         try:
-            return send_from_directory(DATA_FOLDER, filename)
-        except FileNotFoundError:
-            return abort(404)
+            if os.path.exists(PLACEHOLDER_PATH):
+                return send_file(
+                    PLACEHOLDER_PATH,
+                    as_attachment=True,
+                    download_name="文档受限说明.html", # This sets the filename in Chinese
+                    mimetype='text/html'
+                )
+            else:
+                return jsonify({"error": "Placeholder not found"}), 404
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
         
     # ✅ NEW: Verification Route for Frontend AuthGate
     @app.route('/api/verify', methods=['POST'])
@@ -42,25 +54,25 @@ def create_app(config_class=Config):
         # If execution reaches here, the middleware has already validated the password.
         return jsonify({"valid": True})
 
-    # 🔒 Security Middleware
     @app.before_request
     def check_access_password():
-        # Allow preflight CORS checks to pass
-        if request.method == "OPTIONS":
-            return
-        
-        # Skip password check for health check (optional, but good practice)
-        if request.path == '/health':
+        if request.method == "OPTIONS" or request.path == '/health':
             return
 
-        # Define your password
-        CORRECT_PASSWORD = os.getenv("ACCESS_PASSWORD", "sizheng2025")
+        # 1. Fallback to your known test password if .env isn't loaded
+        CORRECT_PASSWORD = os.getenv("ACCESS_PASSWORD") or "sizheng2025"
         
-        # Check the header
+        # 2. Check the header
         user_password = request.headers.get("X-Access-Token")
         
+        # DEBUG: This is vital for local testing. 
+        # Check your terminal/Docker logs to see these values.
+        print(f"--- AUTH CHECK ---")
+        print(f"Path: {request.path}")
+        print(f"Received Token: '{user_password}'")
+        print(f"Expected Token: '{CORRECT_PASSWORD}'")
+        
         if user_password != CORRECT_PASSWORD:
-            print(f"🛑 Blocked unauthorized access from {request.remote_addr}")
             return jsonify({"error": "Unauthorized: Access Denied"}), 401
         
     return app

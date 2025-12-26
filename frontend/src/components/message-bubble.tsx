@@ -101,13 +101,18 @@ const MermaidDiagram = ({ content }: { content: string }) => {
 // ----------------------------------------------------------------------
 // 4. Main Component
 // ----------------------------------------------------------------------
+interface MessageBubbleProps extends ChatMessage {
+  accessPassword?: string; // Add this to your component props
+}
+
 export function MessageBubble({
   role,
   content,
   sources,
   thoughts,
   timestamp,
-}: ChatMessage) {
+  accessPassword,
+}: MessageBubbleProps) {
   const isUser = role === "user";
   const [isThinkingOpen, setIsThinkingOpen] = useState(true);
 
@@ -118,10 +123,43 @@ export function MessageBubble({
 
   const timeString = timestamp
     ? new Date(timestamp).toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    })
+        hour: "2-digit",
+        minute: "2-digit",
+      })
     : "";
+
+  const handleDownload = async (sourceName: string) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/source/${encodeURIComponent(sourceName)}`,
+        {
+          method: "GET",
+          headers: {
+            "X-Access-Token": accessPassword || "sizheng2025",
+          },
+        }
+      );
+
+      if (!response.ok) throw new Error("Failed to fetch placeholder");
+
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = blobUrl;
+
+      // Force the extension to be .html
+      link.download = "文档受限说明.html";
+
+      document.body.appendChild(link);
+      link.click();
+
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error("Download failed:", error);
+    }
+  };
 
   return (
     <div
@@ -223,59 +261,73 @@ export function MessageBubble({
         </div>
 
         {/* Rich Sources Footer (Evidence Cards) - Grouped by Source */}
-        {sources && sources.length > 0 && (() => {
-          // GROUPING LOGIC: Group sources by filename (source property)
-          const groupedSources: Record<string, { pages: Set<string | number>, grade?: string }> = {};
+        {sources &&
+          sources.length > 0 &&
+          (() => {
+            // GROUPING LOGIC: Group sources by filename (source property)
+            const groupedSources: Record<
+              string,
+              { pages: Set<string | number>; grade?: string }
+            > = {};
 
-          sources.forEach(s => {
-            if (typeof s === 'string') {
-              // Backward compatibility for old string sources
-              if (!groupedSources[s]) groupedSources[s] = { pages: new Set() };
-            } else {
-              if (!groupedSources[s.source]) groupedSources[s.source] = { pages: new Set(), grade: s.grade };
-              if (s.page) groupedSources[s.source].pages.add(s.page);
-            }
-          });
+            sources.forEach((s) => {
+              if (typeof s === "string") {
+                // Backward compatibility for old string sources
+                if (!groupedSources[s])
+                  groupedSources[s] = { pages: new Set() };
+              } else {
+                if (!groupedSources[s.source])
+                  groupedSources[s.source] = {
+                    pages: new Set(),
+                    grade: s.grade,
+                  };
+                if (s.page) groupedSources[s.source].pages.add(s.page);
+              }
+            });
 
-          return (
-            <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700/50">
-              <p className="text-xs font-semibold text-zinc-500 mb-3 flex items-center gap-2">
-                <span className="bg-blue-100 text-blue-600 p-1 rounded">📚</span>
-                参考资料与证据链 (Evidence Chain):
-              </p>
-              <div className="grid grid-cols-1 gap-2">
-                {Object.entries(groupedSources).map(([sourceName, data], i) => (
-                  <div
-                    key={i}
-                    className="group relative flex flex-col items-start p-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
-                  >
-                    {/* Header: Source Name Only */}
-                    <div className="flex flex-wrap items-center gap-2 w-full">
-                      {/* Index Badge */}
-                      <span className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-100 text-blue-600 text-[10px] font-bold shrink-0">
-                        {i + 1}
-                      </span>
+            return (
+              <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700/50">
+                <p className="text-xs font-semibold text-zinc-500 mb-3 flex items-center gap-2">
+                  <span className="bg-blue-100 text-blue-600 p-1 rounded">
+                    📚
+                  </span>
+                  参考资料与证据链 (Evidence Chain):
+                </p>
+                <div className="grid grid-cols-1 gap-2">
+                  {Object.entries(groupedSources).map(
+                    ([sourceName, data], i) => (
+                      <div
+                        key={i}
+                        className="group relative flex flex-col items-start p-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
+                      >
+                        {/* Header: Source Name Only */}
+                        <div className="flex flex-wrap items-center gap-2 w-full">
+                          {/* Index Badge */}
+                          <span className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-100 text-blue-600 text-[10px] font-bold shrink-0">
+                            {i + 1}
+                          </span>
 
-                      {/* Filename */}
-                      <span className="text-sm font-medium text-zinc-700 dark:text-zinc-200 truncate flex-1 min-w-[150px]">
-                        {sourceName}
-                      </span>
-                    </div>
+                          {/* Filename */}
+                          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-200 truncate flex-1 min-w-[150px]">
+                            {sourceName}
+                          </span>
+                        </div>
 
-                    {/* Link to Source File */}
-                    <a
-                      href={`${API_BASE_URL}/api/source/${encodeURIComponent(sourceName)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="absolute inset-0 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      aria-label={`View source ${sourceName}`}
-                    />
-                  </div>
-                ))}
+                        {/* Link to Source File */}
+                        <button
+                          onClick={() => handleDownload(sourceName)}
+                          className="absolute inset-0 rounded-lg focus:ring-2 focus:ring-blue-500 hover:bg-black/5"
+                          aria-label={`Download source ${sourceName}`}
+                        >
+                          {/* You can put an icon here if you want */}
+                        </button>
+                      </div>
+                    )
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })()}
+            );
+          })()}
       </div>
     </div>
   );
